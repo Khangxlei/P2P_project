@@ -9,6 +9,8 @@ logging.basicConfig(filename='debug.log', level=logging.DEBUG)
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Change this to a secure secret key
 
+app.config['DATABASE'] = 'database.db'
+
 def init_db(app):
     with app.app_context():
         db = get_db()
@@ -19,7 +21,7 @@ def init_db(app):
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
-        db = g._database = sqlite3.connect('database.db')
+        db = g._database = sqlite3.connect(app.config['DATABASE'])
     return db
 
 def close_connection(exception=None):
@@ -186,9 +188,6 @@ def logout():
         logging.debug(f'Could not log user out')
         response_data = {'message': 'User logged out unsuccessfully', 'status_code': 400}
         return jsonify(response_data), 400
-
-
-app.config['DATABASE'] = 'database.db'
 
 if __name__ == '__main__':
     import threading
