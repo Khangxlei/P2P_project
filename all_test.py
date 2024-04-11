@@ -56,21 +56,26 @@ def ping(ip_address):
         sock.close()
 
 # Unit tests
-@pytest.mark.parametrize("username, password", [
-    ('khang', 'password'),  
-    ('adam', 'khang123'),  
+@pytest.mark.parametrize("username, password, pf", [
+    ('khang', 'Password123', 'pass'),  
+    ('adam', 'Khang123', 'pass'),  
+    ('bob', 'weakpassword', 'fail')
 ])
-def test_signup(username, password):
+def test_signup(username, password, pf):
 
     response = signup(username, password)
-    assert response['message'] == 'User signed up successfully'
-    assert response['status_code'] == 200
+    if pf == 'pass':
+        assert response['message'] == 'User signed up successfully'
+        assert response['status_code'] == 200
+    elif pf == 'fail':
+        assert response['message'] == 'Password is inadequate. It must be at least 8 characters long and contain at least one lowercase letter, one uppercase letter, and one digit.'
+        assert response['status_code'] == 400
 
 
 # Unit tests
 @pytest.mark.parametrize("username, password", [
-    ('khang', 'password'),  
-    ('adam', 'khang123'),  
+    ('khang', 'Password123'),  
+    ('adam', 'Khang123'),  
 ])
 def test_login(username, password):
 

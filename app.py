@@ -158,6 +158,19 @@ def index():
         return redirect(url_for('chat'))
     return render_template('index.html')
 
+# Function to check password strength
+def check_password_strength(password):
+    # Define minimum requirements for a strong password
+    min_length = 8
+    has_lowercase = any(char.islower() for char in password)
+    has_uppercase = any(char.isupper() for char in password)
+    has_digit = any(char.isdigit() for char in password)
+    
+    # Check if the password meets the minimum requirements
+    if len(password) < min_length or not has_lowercase or not has_uppercase or not has_digit:
+        return False
+    return True
+
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
@@ -165,6 +178,11 @@ def signup():
         password = request.form['password']
         hashed_password = hash_password(password)
         ip_address = request.remote_addr
+
+        # Data sanitization
+        if not check_password_strength(password):
+            return jsonify({'message': 'Password is inadequate. It must be at least 8 characters long and contain at least one lowercase letter, one uppercase letter, and one digit.', 'status_code':400}), 400
+
         
         # Use a try-finally block to ensure the connection is properly closed
         try:
