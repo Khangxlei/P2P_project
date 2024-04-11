@@ -3,6 +3,10 @@ import sqlite3
 import socket
 from flask import jsonify
 import logging
+import bcrypt
+from cryptography.fernet import Fernet
+import sqlite3
+
  
 logging.basicConfig(filename='debug.log', level=logging.DEBUG)
 
@@ -10,6 +14,10 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Change this to a secure secret key
 
 app.config['DATABASE'] = 'database.db'
+
+# Generate a key for encryption
+key = Fernet.generate_key()
+cipher_suite = Fernet(key)
 
 def init_db(app):
     with app.app_context():
@@ -36,12 +44,27 @@ def add_user(username, password, ip_address):
     c.execute("INSERT INTO users (username, password, ip_address, is_online) VALUES (?, ?, ?, 0)", (username, password, ip_address))
     db.commit()
 
+# Function to authenticate users that uses hashing
 # Function to authenticate users
 def authenticate_user(username, password):
     db = get_db()
     c = db.cursor()
-    c.execute("SELECT username, ip_address FROM users WHERE username = ? AND password = ?", (username, password))
-    return c.fetchone()
+    c.execute("SELECT username, password FROM users WHERE username = ?", (username,))
+    user = c.fetchone()
+    if user:
+        stored_encrypted_hashed_password = user[1]  # Assuming password is stored at index 1
+        stored_hashed_password = decrypt_data(stored_encrypted_hashed_password)
+        if isinstance(password, str):
+            password = password.encode('utf-8')  # Convert string password to bytes
+        if isinstance(stored_hashed_password, str):
+            stored_hashed_password = stored_hashed_password.encode('utf-8')  # Convert stored hashed password to bytes
+        try:
+            if bcrypt.checkpw(password, stored_hashed_password):
+                return user
+        except ValueError:
+            # Handle invalid salt error
+            return None
+    return None
 
 # Function to fetch online users
 def get_online_users():
@@ -108,6 +131,27 @@ def ping(ip_address):
     finally:
         sock.close()
 
+def hash_password(password):
+    # Generate a salt and hash the password
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed_password
+
+def verify_password(password, hashed_password):
+    return bcrypt.checkpw(password.encode('utf-8'), hashed_password)
+
+# Encrypt data
+def encrypt_data(data):
+    if isinstance(data, str):
+        data = data.encode()  # Convert string to bytes if necessary
+    return cipher_suite.encrypt(data)
+
+# Decrypt data
+def decrypt_data(encrypted_data):
+    decrypted_data = cipher_suite.decrypt(encrypted_data)
+    return decrypted_data.decode()  # Decode bytes to string
+
+
 @app.route('/')
 def index():
     if 'username' in session:
@@ -119,6 +163,7 @@ def signup():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        hashed_password = hash_password(password)
         ip_address = request.remote_addr
         
         # Use a try-finally block to ensure the connection is properly closed
@@ -128,7 +173,9 @@ def signup():
             c = conn.cursor()
             
             # Execute your database operations
-            c.execute("INSERT INTO users (username, password, ip_address, is_online) VALUES (?, ?, ?, 0)", (username, password, ip_address))
+            encrypted_hashed_password = encrypt_data(hashed_password)
+            encrypted_ip_address = encrypt_data(ip_address)
+            c.execute("INSERT INTO users (username, password, ip_address, is_online) VALUES (?, ?, ?, 0)", (username, encrypted_hashed_password, encrypted_ip_address))
             conn.commit()
 
             # Return a JSON response
