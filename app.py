@@ -75,10 +75,15 @@ def get_online_users():
 
 # Function to store chat messages
 def upload_chat_to_db(sender, receiver, message, sender_ip):
+    if len(message) == 0:
+        return 'fail'
+    
+    encrypted_message = encrypt_data(message)
     db = get_db()
     c = db.cursor()
-    c.execute("INSERT INTO chats (sender, receiver, message, sender_ip) VALUES (?, ?, ?, ?)", (sender, receiver, message, sender_ip))
+    c.execute("INSERT INTO chats (sender, receiver, message, sender_ip) VALUES (?, ?, ?, ?)", (sender, receiver, encrypted_message, sender_ip))
     db.commit()
+    return 'success'
 
 def update_user_online_status(username, is_online):
     try:
@@ -231,9 +236,13 @@ def chat():
         message = request.form['message']
         sender_ip = request.remote_addr
         try:
-            upload_chat_to_db(sender_id, receiver_id, message, sender_ip)
-            response_data = {'message': 'Chat sent successfully', 'status_code': 200}
-            return jsonify(response_data), 200
+            response = upload_chat_to_db(sender_id, receiver_id, message, sender_ip)
+            if response == 'success':
+                response_data = {'message': 'Chat sent successfully', 'status_code': 200}
+                return jsonify(response_data), 200
+            else:
+                response_data = {'message': 'Content of message is inadequate', 'status_code': 400}
+                return jsonify(response_data), 400
 
 
         except:
